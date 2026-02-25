@@ -49,7 +49,7 @@ if prompt := st.chat_input("¿Cuál es tu duda sobre la glucólisis o la guía?"
     with st.chat_message("assistant"):
         # Configuramos el modelo (Flash es el más económico y rápido)
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+            model_name="gemini-2.0-flash",
             system_instruction=SYSTEM_PROMPT
         )
         
