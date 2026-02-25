@@ -54,8 +54,12 @@ if prompt := st.chat_input("¿Cuál es tu duda sobre la glucólisis o la guía?"
         )
         
         # Enviamos el historial para que tenga contexto
-        response = model.generate_content(prompt)
-        full_response = response.text
+        try:
+            response = model.generate_content(prompt)
+            full_response = response.text
+        except Exception as e:
+            full_response = f"⚠️ Error detectado: {e}"
+            
         
         st.markdown(full_response)
         
