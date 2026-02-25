@@ -1,56 +1,66 @@
 import streamlit as st
-from openai import OpenAI
+import google.generativeai as genai
 
-# Show title and description.
-st.title("💬 Chatbot")
-st.write(
-    "This is a simple chatbot that uses OpenAI's GPT-3.5 model to generate responses. "
-    "To use this app, you need to provide an OpenAI API key, which you can get [here](https://platform.openai.com/account/api-keys). "
-    "You can also learn how to build this app step by step by [following our tutorial](https://docs.streamlit.io/develop/tutorials/llms/build-conversational-apps)."
-)
+# --- CONFIGURACIÓN DE LA PÁGINA ---
+st.set_page_config(page_title="Tutor Química Biológica II", layout="centered")
 
-# Ask user for their OpenAI API key via `st.text_input`.
-# Alternatively, you can store the API key in `./.streamlit/secrets.toml` and access it
-# via `st.secrets`, see https://docs.streamlit.io/develop/concepts/connections/secrets-management
-openai_api_key = st.text_input("OpenAI API Key", type="password")
-if not openai_api_key:
-    st.info("Please add your OpenAI API key to continue.", icon="🗝️")
-else:
+# --- SEGURIDAD: API KEY ---
+# En Streamlit Cloud, esto se configura en "Secrets" para que no sea público.
+api_key = st.secrets["GOOGLE_API_KEY"]
+genai.configure(api_key=api_key)
 
-    # Create an OpenAI client.
-    client = OpenAI(api_key=openai_api_key)
+# --- EL PROMPT MAESTRO (Oculto para el alumno) ---
+# Aquí incluyes el estilo Lehninger y la guía de problemas.
+SYSTEM_PROMPT = """
+Eres un tutor experto en Bioquímica para Química Biológica 2. 
+Tu estilo es el 'Estilo simple 1': Lehninger aesthetic, jerarquía visual (Enzimas 25px, Metabolitos 20px).
 
-    # Create a session state variable to store the chat messages. This ensures that the
-    # messages persist across reruns.
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+INSTRUCCIONES PEDAGÓGICAS:
+1. No des la respuesta directa a los problemas. 
+2. Guía al alumno con preguntas sobre el balance de masa o el Control Metabólico.
+3. Si el alumno está muy perdido, explica el concepto usando la lógica de flujos metabólicos.
 
-    # Display the existing chat messages via `st.chat_message`.
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+GUÍA DE PROBLEMAS Y RESPUESTAS (Para tu uso interno, no mostrar):
+- Problema 1 (PFK-1): La respuesta correcta involucra el efecto del F-2,6-BP.
+- Problema 2 (Control): El coeficiente de control de flujo se distribuye entre varias enzimas.
+[Añade aquí el resto de tu material]
+"""
 
-    # Create a chat input field to allow the user to enter a message. This will display
-    # automatically at the bottom of the page.
-    if prompt := st.chat_input("What is up?"):
+st.title("🧪 Tutor de Química Biológica II")
+st.markdown("Bienvenido. Consulta tus dudas sobre la materia o los problemas de la guía.")
 
-        # Store and display the current prompt.
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+# --- GESTIÓN DEL HISTORIAL DE CHAT ---
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-        # Generate a response using the OpenAI API.
-        stream = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": m["role"], "content": m["content"]}
-                for m in st.session_state.messages
-            ],
-            stream=True,
+# Mostrar mensajes previos
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# --- LÓGICA DEL CHAT ---
+if prompt := st.chat_input("¿Cuál es tu duda sobre la glucólisis o la guía?"):
+    # Guardar y mostrar mensaje del alumno
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Generar respuesta de la IA
+    with st.chat_message("assistant"):
+        # Configuramos el modelo (Flash es el más económico y rápido)
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=SYSTEM_PROMPT
         )
+        
+        # Enviamos el historial para que tenga contexto
+        response = model.generate_content(prompt)
+        full_response = response.text
+        
+        st.markdown(full_response)
+        
+        # Botón para que el alumno pueda enviarte la respuesta si tiene dudas
+        st.caption("Si esta respuesta no te convence, copia el texto y envíalo al docente.")
 
-        # Stream the response to the chat using `st.write_stream`, then store it in 
-        # session state.
-        with st.chat_message("assistant"):
-            response = st.write_stream(stream)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    # Guardar respuesta en el historial
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
